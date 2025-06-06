@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Tic-Tac-Toe Advanced</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 2rem;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    :root {
+      --bg: #f2f2f2;
+      --text: #000;
+      --cell-bg: #fff;
+      --hover: #e6f7ff;
+      --winner: #90ee90;
+    }
+
+    .dark-mode {
+      --bg: #1e1e1e;
+      --text: #ffffff;
+      --cell-bg: #333;
+      --hover: #555;
+      --winner: #2ecc71;
+    }
+
+    h1, h2 {
+      margin: 0.5em 0;
+    }
+
+    .controls, .scoreboard {
+      margin: 1em 0;
+    }
+
+    .scoreboard {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-gap: 10px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+
+    .cell {
+      width: 100px;
+      height: 100px;
+      background-color: var(--cell-bg);
+      border: 2px solid #444;
+      font-size: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .cell:hover {
+      background-color: var(--hover);
+    }
+
+    .winner {
+      background-color: var(--winner) !important;
+    }
+
+    button, input, select {
+      padding: 8px 16px;
+      font-size: 1rem;
+      margin: 5px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+    }
+
+    .dark-toggle {
+      background: #444;
+      color: #fff;
+    }
+
+    @media (max-width: 500px) {
+      .board {
+        grid-template-columns: repeat(3, 80px);
+      }
+      .cell {
+        width: 80px;
+        height: 80px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Tic-Tac-Toe 🕹️</h1>
+
+  <div class="controls">
+    <input id="playerX" placeholder="Player X Name" />
+    <input id="playerO" placeholder="Player O Name" />
+    <label for="modeSelect">Game Mode:</label>
+    <select id="modeSelect">
+      <option value="2p">Two Player</option>
+      <option value="1p-x">Single Player (You are X)</option>
+      <option value="1p-o">Single Player (You are O)</option>
+    </select>
+    <br />
+    <button onclick="startGame()">Start Game</button>
+    <button onclick="resetBoardOnly()">New Game (Same Players)</button>
+    <button onclick="resetScores()">Reset Scores</button>
+    <button onclick="toggleDarkMode()" class="dark-toggle">🌙 Toggle Dark Mode</button>
+  </div>
+
+  <div class="scoreboard">
+    <div><span id="nameX">Player X</span>: <span id="scoreX">0</span></div>
+    <div><span id="nameO">Player O</span>: <span id="scoreO">0</span></div>
+  </div>
+
+  <div class="board" id="board"></div>
+  <h2 id="status">Click Start to Play!</h2>
+
+  <audio id="clickSound" src="https://www.soundjay.com/buttons/sounds/button-16.mp3"></audio>
+  <audio id="winSound" src="https://www.soundjay.com/human/sounds/applause-8.mp3"></audio>
+
+  <script>
+    let board = Array(9).fill("");
+    let currentPlayer = "X";
+    let isGameOver = false;
+    let gameMode = "2p";
+    let scores = { X: 0, O: 0 };
+    const boardEl = document.getElementById("board");
+    const statusEl = document.getElementById("status");
+
+    const clickSound = document.getElementById("clickSound");
+    const winSound = document.getElementById("winSound");
+
+    const nameXEl = document.getElementById("nameX");
+    const nameOEl = document.getElementById("nameO");
+    const scoreXEl = document.getElementById("scoreX");
+    const scoreOEl = document.getElementById("scoreO");
+
+    function startGame() {
+      scores = { X: 0, O: 0 };
+      saveScores();
+      resetBoardOnly();
+      updateScoreDisplay();
+    }
+
+    function resetBoardOnly() {
+      board = Array(9).fill("");
+      isGameOver = false;
+      currentPlayer = "X";
+      gameMode = document.getElementById("modeSelect").value;
+
+      const playerXInput = document.getElementById("playerX").value;
+      const playerOInput = document.getElementById("playerO").value;
+
+      nameXEl.textContent = gameMode === "1p-o" ? "AI" : (playerXInput || "Player X");
+      nameOEl.textContent = gameMode === "1p-x" ? "AI" : (playerOInput || "Player O");
+
+      updateStatus();
+      createBoard();
+
+      if (gameMode === "1p-o") {
+        setTimeout(aiMove, 500); // AI starts as X
+      }
+    }
+
+    function resetScores() {
+      scores = { X: 0, O: 0 };
+      saveScores();
+      updateScoreDisplay();
+    }
+
+    function createBoard() {
+      boardEl.innerHTML = "";
+      board.forEach((cell, index) => {
+        const div = document.createElement("div");
+        div.classList.add("cell");
+        div.textContent = cell;
+        div.addEventListener("click", () => handleMove(index));
+        boardEl.appendChild(div);
+      });
+    }
+
+    function handleMove(index) {
+      if (board[index] !== "" || isGameOver) return;
+
+      clickSound.play();
+      board[index] = currentPlayer;
+      updateBoard();
+      if (checkWinner(currentPlayer)) return;
+
+      currentPlayer = currentPlayer === "X" ? "O" : "X";
+      updateStatus();
+
+      if (!isGameOver) {
+        if ((gameMode === "1p-x" && currentPlayer === "O") ||
+            (gameMode === "1p-o" && currentPlayer === "X")) {
+          setTimeout(aiMove, 500);
+        }
+      }
+    }
+
+    function aiMove() {
+      let empty = board.map((v, i) => v === "" ? i : null).filter(i => i !== null);
+      let choice = empty[Math.floor(Math.random() * empty.length)];
+      handleMove(choice);
+    }
+
+    function updateBoard() {
+      const cells = document.querySelectorAll(".cell");
+      board.forEach((val, i) => {
+        cells[i].textContent = val;
+        cells[i].classList.remove("winner");
+      });
+    }
+
+    function checkWinner(p) {
+      const wins = [
+        [0,1,2], [3,4,5], [6,7,8],
+        [0,3,6], [1,4,7], [2,5,8],
+        [0,4,8], [2,4,6]
+      ];
+      for (let pattern of wins) {
+        const [a,b,c] = pattern;
+        if (board[a] === p && board[b] === p && board[c] === p) {
+          isGameOver = true;
+          highlightWin(pattern);
+          winSound.play();
+          statusEl.textContent = `🎉 ${p === "X" ? nameXEl.textContent : nameOEl.textContent} Wins!`;
+          scores[p]++;
+          saveScores();
+          updateScoreDisplay();
+          return true;
+        }
+      }
+      if (!board.includes("")) {
+        isGameOver = true;
+        statusEl.textContent = "It's a Draw! 🤝";
+        return true;
+      }
+      return false;
+    }
+
+    function highlightWin(pattern) {
+      const cells = document.querySelectorAll(".cell");
+      pattern.forEach(i => cells[i].classList.add("winner"));
+    }
+
+    function updateStatus() {
+      if (!isGameOver) {
+        statusEl.textContent = `${currentPlayer === "X" ? nameXEl.textContent : nameOEl.textContent}'s Turn`;
+      }
+    }
+
+    function updateScoreDisplay() {
+      scoreXEl.textContent = scores.X;
+      scoreOEl.textContent = scores.O;
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark-mode");
+    }
+
+    function saveScores() {
+      localStorage.setItem("ttt-scores", JSON.stringify(scores));
+    }
+
+    function loadScores() {
+      const saved = localStorage.getItem("ttt-scores");
+      if (saved) {
+        scores = JSON.parse(saved);
+        updateScoreDisplay();
+      }
+    }
+
+    window.onload = () => {
+      loadScores();
+      createBoard();
+    };
+  </script>
+</body>
+</html>
